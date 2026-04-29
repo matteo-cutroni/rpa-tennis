@@ -1,0 +1,45 @@
+### Python ###
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+### Ambienti Virtuali (UV e standard) ###
+.venv/
+venv/
+ENV/
+env/
+
+### macOS (Specifico per il tuo computer) ###
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon?
+._*
+.Spotlight-V100
+.Trashes
+
+### Credenziali e Segreti (MOLTO IMPORTANTE) ###
+# Non vogliamo caricare le tue password del circolo su GitHub!
+.env
+secret_config.json
+credentials.py
+
+### IDE (VS Code o PyCharm) ###
+.vscode/
+.idea/
