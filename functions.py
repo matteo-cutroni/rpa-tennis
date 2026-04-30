@@ -5,9 +5,37 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import StaleElementReferenceException, TimeoutException
 import time
+from datetime import datetime, timedelta
 
 # Carica le variabili d'ambiente dal file .env
 load_dotenv()
+    
+
+def seleziona_radio_primefaces(driver, valore):
+    """
+    Trova un radio button in base al suo 'value' (es. '1' per domani, '2' per il terzo campo)
+    e clicca il box visibile associato.
+    """
+    wait = WebDriverWait(driver, 10)
+    
+    # Questo XPath è magico: cerca l'input nascosto con il valore corretto, 
+    # torna indietro e clicca il div visibile subito dopo (la scatolina del pallino)
+    xpath = f"//input[contains(@name, 'form-prenota:') and @type='radio' and @value='{valore}']/parent::div/following-sibling::div[contains(@class, 'ui-radiobutton-box')]"
+    
+    try:
+        # Troviamo tutti i box che corrispondono (potrebbero essercene per i giorni e per i campi)
+        # Selezioniamo il box specifico in base a dove ci troviamo (è gestito nell'XPath o dal click JS)
+        box = wait.until(EC.presence_of_element_located((By.XPATH, xpath)))
+        
+        # Scorriamo la pagina fino all'elemento per essere sicuri che sia visibile
+        driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", box)
+        time.sleep(0.5)
+        
+        # Il click tramite Javascript è immensamente più stabile su PrimeFaces
+        driver.execute_script("arguments[0].click();", box)
+        
+    except Exception as e:
+        raise Exception(f"Non sono riuscito a cliccare il pallino con valore '{valore}'. Dettaglio: {e}")
 
 def esegui_login(driver, id_user, id_pass, id_btn):
     """
@@ -181,3 +209,17 @@ def compila_autocomplete(driver, id_input, testo):
         
     except TimeoutException:
         raise Exception(f"ERRORE: La tabella dei suggerimenti non è apparsa per '{testo}'.")
+    
+
+def genera_ordine_preferenze(orario_scelto):
+    """
+    Prende un orario (es. '19:00') e restituisce una lista:
+    [orario_scelto, orario_scelto - 30min, orario_scelto + 30min]
+    """
+    fmt = "%H:%M"
+    ora_dt = datetime.strptime(orario_scelto, fmt)
+    
+    meno_trenta = (ora_dt - timedelta(minutes=30)).strftime(fmt)
+    piu_trenta = (ora_dt + timedelta(minutes=30)).strftime(fmt)
+    
+    return [orario_scelto, meno_trenta, piu_trenta]
