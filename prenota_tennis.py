@@ -51,7 +51,6 @@ def main():
         # Clicchiamo l'input corrispondente al Campo N° 3
         f.seleziona_radio_primefaces(driver, "3")
         time.sleep(1)
-
         # Passiamo l'intera lista alla nostra funzione
         f.seleziona_orario(driver, preferenze_orari)
 
@@ -89,7 +88,7 @@ def main():
         # 2. Scorriamo la pagina fino al bottone per evitare che sia coperto da banner
         driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", bottone_finale)
         time.sleep(1)
-        
+
         # 3. Click "nucleare" in Javascript (infallibile su PrimeFaces)
         driver.execute_script("arguments[0].click();", bottone_finale)
         

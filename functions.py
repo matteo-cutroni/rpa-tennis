@@ -4,6 +4,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import StaleElementReferenceException, TimeoutException
+from selenium.webdriver.common.action_chains import ActionChains
 import time
 from datetime import datetime, timedelta
 
@@ -104,46 +105,38 @@ def clicca_elemento(driver, id_elemento):
             
     raise Exception(f"Impossibile cliccare su {id_elemento}")
 
-def seleziona_orario(driver, lista_orari):
+def seleziona_orario(driver, orari_preferiti):
     """
-    Cerca l'orario e simula l'intera sequenza di un mouse umano (giù, su, click) 
-    per ingannare i sensori di PrimeFaces.
+    Scorre la lista degli orari preferiti e cerca la disponibilità 
+    sia nella tabella della Mattina che in quella del Pomeriggio, usando un click "reale".
     """
-    wait = WebDriverWait(driver, 2)
+    wait = WebDriverWait(driver, 3) 
     
-    for ora in lista_orari:
-        print(f"🔍 Verifico disponibilità per le ore {ora}...")
-        # Puntiamo alla cella (td) esatta
-        xpath = f"//tr[td[1][normalize-space()='{ora}']]/td[1]"
+    for orario in orari_preferiti:
+        print(f"🔍 Verifico disponibilità per le ore {orario}...")
+        
+        # Cerca la riga (tr) contenente l'orario
+        xpath_riga = f"//div[contains(@class, 'tableorari')]//tr[td[1][text()='{orario}']]"
         
         try:
-            cella = wait.until(EC.presence_of_element_located((By.XPATH, xpath)))
+            riga = wait.until(EC.presence_of_element_located((By.XPATH, xpath_riga)))
             
-            # Portiamo la tabella al centro dello schermo
-            driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", cella)
+            # Scorriamo fino alla riga
+            driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", riga)
             time.sleep(0.5)
             
-            # Creiamo la sequenza perfetta di un click umano
-            script_mouse_reale = """
-                var el = arguments[0];
-                var eventi = ['mouseover', 'mousedown', 'mouseup', 'click'];
-                
-                eventi.forEach(function(nomeEvento) {
-                    var evento = new MouseEvent(nomeEvento, {
-                        bubbles: true,
-                        cancelable: true,
-                        view: window
-                    });
-                    el.dispatchEvent(evento);
-                });
-            """
-            driver.execute_script(script_mouse_reale, cella)
+            # 🎾 IL TRUCCO È QUI: Usiamo ActionChains per simulare il mouse che va sulla prima cella (l'orario) e fa click fisico
+            cella_orario = riga.find_element(By.XPATH, "./td[1]")
+            ActionChains(driver).move_to_element(cella_orario).click().perform()
             
-            print(f"✅ Successo! Orario {ora} trovato e cliccato con sequenza mouse.")
-            return ora 
+            print(f"✅ Successo! Orario {orario} trovato e cliccato con il mouse.")
+            return True 
             
-        except TimeoutException:
-            print(f"❌ Orario {ora} non trovato (o già occupato). Passo alla prossima scelta...")
+        except Exception as e:
+            # Se non lo trova o non è cliccabile, passa in silenzio al prossimo
+            print(f"❌ Orario {orario} non disponibile. Passo alla prossima preferenza...")
+            
+    raise Exception("Nessuno degli orari scelti è disponibile. Prenotazione fallita.")
             
     raise Exception(f"ERRORE CRITICO: Nessuno degli orari preferiti ({lista_orari}) è disponibile!")
 
