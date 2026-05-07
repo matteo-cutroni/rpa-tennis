@@ -77,8 +77,8 @@ def compila_campo(driver, id_elemento, testo_da_inserire):
 
 def clicca_elemento(driver, id_elemento):
     """
-    Funzione universale potenziata per PrimeFaces: clicca la Label associata all'input 
-    o lancia direttamente l'evento 'change' per forzare l'aggiornamento della pagina.
+    Funzione universale potenziata per PrimeFaces: clicca l'elemento
+    e attende che tutte le chiamate AJAX (caricamenti della pagina) siano terminate.
     """
     wait = WebDriverWait(driver, 10)
     for tentativo in range(5):
@@ -98,47 +98,61 @@ def clicca_elemento(driver, id_elemento):
                 }
             """
             driver.execute_script(script_infallibile, elemento)
+            
+            # --- 🛡️ LA MAGIA ANTI-CRASH PER PRIMEFACES 🛡️ ---
+            # Diciamo a Selenium di aspettare finché jQuery e PrimeFaces non dichiarano di aver finito i caricamenti
+            wait.until(lambda d: d.execute_script(
+                "return (typeof jQuery === 'undefined' || jQuery.active === 0) && "
+                "(typeof PrimeFaces === 'undefined' || PrimeFaces.ajax.Queue.isEmpty());"
+            ))
+            
+            # Un micro-riposo per dare tempo al browser di "disegnare" i nuovi elementi a schermo
+            time.sleep(0.5) 
+            
             return
             
         except StaleElementReferenceException:
             print(f"Tentativo {tentativo + 1}: Elemento instabile, riprovo...")
             
-    raise Exception(f"Impossibile cliccare su {id_elemento}")
+    raise Exception(f"Impossibile cliccare su {id_elemento} o timeout caricamento pagina.")
 
 def seleziona_orario(driver, orari_preferiti):
     """
-    Scorre la lista degli orari preferiti e cerca la disponibilità 
-    sia nella tabella della Mattina che in quella del Pomeriggio, usando un click "reale".
+    Scorre la lista degli orari e clicca in modo nativo la cella corrispondente, 
+    risvegliando gli eventi AJAX di PrimeFaces.
     """
     wait = WebDriverWait(driver, 3) 
     
     for orario in orari_preferiti:
         print(f"🔍 Verifico disponibilità per le ore {orario}...")
         
-        # Cerca la riga (tr) contenente l'orario
-        xpath_riga = f"//div[contains(@class, 'tableorari')]//tr[td[1][text()='{orario}']]"
+        # Puntiamo direttamente alla cella esatta all'interno di una riga "selezionabile"
+        xpath_cella = f"//div[contains(@class, 'tableorari')]//tr[contains(@class, 'ui-datatable-selectable')]/td[1][text()='{orario}']"
         
         try:
-            riga = wait.until(EC.presence_of_element_located((By.XPATH, xpath_riga)))
+            # NOVITÀ 1: Usiamo element_to_be_clickable invece di presence_of_element_located
+            cella = wait.until(EC.element_to_be_clickable((By.XPATH, xpath_cella)))
             
-            # Scorriamo fino alla riga
-            driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", riga)
+            # Scorriamo la pagina e diamo mezzo secondo per fermare l'animazione di scroll
+            driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", cella)
             time.sleep(0.5)
             
-            # 🎾 IL TRUCCO È QUI: Usiamo ActionChains per simulare il mouse che va sulla prima cella (l'orario) e fa click fisico
-            cella_orario = riga.find_element(By.XPATH, "./td[1]")
-            ActionChains(driver).move_to_element(cella_orario).click().perform()
+            # NOVITÀ 2: Click nativo di Selenium (il metodo più affidabile per triggerare AJAX)
+            try:
+                cella.click()
+            except Exception as inner_e:
+                # Se per caso un banner copre il click nativo, fallback sulla riga intera
+                print("Click nativo fallito, provo sulla riga intera...")
+                riga = cella.find_element(By.XPATH, "./parent::tr")
+                ActionChains(driver).move_to_element(riga).click().perform()
             
-            print(f"✅ Successo! Orario {orario} trovato e cliccato con il mouse.")
+            print(f"✅ Successo! Orario {orario} trovato e cliccato.")
             return True 
             
         except Exception as e:
-            # Se non lo trova o non è cliccabile, passa in silenzio al prossimo
-            print(f"❌ Orario {orario} non disponibile. Passo alla prossima preferenza...")
+            print(f"❌ Orario {orario} non cliccabile o non disponibile. Passo oltre...")
             
     raise Exception("Nessuno degli orari scelti è disponibile. Prenotazione fallita.")
-            
-    raise Exception(f"ERRORE CRITICO: Nessuno degli orari preferiti ({lista_orari}) è disponibile!")
 
 def imposta_dropdown(driver, id_select_nascosto, valore):
     """
